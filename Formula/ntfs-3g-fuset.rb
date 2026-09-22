@@ -27,8 +27,10 @@ class Ntfs3gFuset < Formula
     fuset_lib = "#{fuset_prefix}/lib"
     fuset_include = "#{fuset_prefix}/include/fuse"
 
+    # -lfuse-t는 넣지 않는다: 링크된 conftest가 brew 샌드박스에서 trap으로 죽음.
+    # ntfs-3g fork의 Makefile.am이 FUSE_LIBS=-lfuse-t를 자체적으로 넣어준다.
     ENV.append "CPPFLAGS", "-I#{fuset_include}"
-    ENV.append "LDFLAGS", "-L#{fuset_lib} -lfuse-t -Wl,-rpath,#{fuset_lib} -Wl,-rpath,/usr/local/lib -lintl"
+    ENV.append "LDFLAGS", "-L#{fuset_lib} -Wl,-rpath,#{fuset_lib} -Wl,-rpath,/usr/local/lib -lintl"
 
     system "./autogen.sh"
     system "./configure",
