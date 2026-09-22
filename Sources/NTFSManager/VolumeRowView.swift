@@ -36,37 +36,37 @@ struct VolumeRowView: View {
     @ViewBuilder var stateBadge: some View {
         switch volume.mountState {
         case .fuseTReadWrite(let mp):
-            Label("읽기/쓰기", systemImage: "checkmark.circle.fill")
+            Label(L("읽기/쓰기"), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green).font(.caption)
                 .help(mp)
         case .nativeReadOnly(let mp):
-            Label("읽기 전용 (macOS)", systemImage: "lock.fill")
+            Label(L("읽기 전용 (macOS)"), systemImage: "lock.fill")
                 .foregroundStyle(.orange).font(.caption)
                 .help(mp)
         case .unmounted:
-            Text("언마운트됨").font(.caption).foregroundStyle(.secondary)
+            Text(L("언마운트됨")).font(.caption).foregroundStyle(.secondary)
         case .busy:
-            Text("작업 중").font(.caption).foregroundStyle(.secondary)
+            Text(L("작업 중")).font(.caption).foregroundStyle(.secondary)
         }
     }
 
     @ViewBuilder var actions: some View {
         switch volume.mountState {
         case .nativeReadOnly:
-            Button("읽기/쓰기로 마운트") { store.mountRW(volume) }
+            Button(L("읽기/쓰기로 마운트")) { store.mountRW(volume) }
                 .buttonStyle(.borderedProminent)
-            Button("언마운트") { store.unmount(volume) }
-            Button("제거") { store.eject(volume) }
+            Button(L("언마운트")) { store.unmount(volume) }
+            Button(L("제거")) { store.eject(volume) }
         case .fuseTReadWrite(let mp):
             Button("Finder") { NSWorkspace.shared.open(URL(fileURLWithPath: mp)) }
-            Button("언마운트") { store.unmount(volume) }
-            Button("제거") { store.eject(volume) }
+            Button(L("언마운트")) { store.unmount(volume) }
+            Button(L("제거")) { store.eject(volume) }
         case .unmounted:
-            Button("읽기/쓰기") { store.mountRW(volume) }
+            Button(L("읽기/쓰기")) { store.mountRW(volume) }
                 .buttonStyle(.borderedProminent)
-            Button("읽기전용") { store.mountRO(volume) }
-            Button("복구") { store.repair(volume) }
-            Button("제거") { store.eject(volume) }
+            Button(L("읽기전용")) { store.mountRO(volume) }
+            Button(L("복구")) { store.repair(volume) }
+            Button(L("제거")) { store.eject(volume) }
         case .busy:
             EmptyView()
         }

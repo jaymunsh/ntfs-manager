@@ -9,36 +9,36 @@ struct SetupGuideView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("쓰기 지원 설치")
+            Text(L("쓰기 지원 설치"))
                 .font(.title2).bold()
 
-            Text("NTFS 쓰기에는 두 구성요소가 필요합니다:")
+            Text(L("NTFS 쓰기에는 두 구성요소가 필요합니다:"))
                 .font(.callout)
 
-            DepRow(name: "FUSE-T", desc: "커널 확장 없는 FUSE (kextless)",
+            DepRow(name: "FUSE-T", desc: L("커널 확장 없는 FUSE (kextless)"),
                    ok: store.deps.fuseT)
-            DepRow(name: "ntfs-3g", desc: "NTFS 읽기/쓰기 드라이버 (FUSE-T 빌드)",
+            DepRow(name: "ntfs-3g", desc: L("NTFS 읽기/쓰기 드라이버 (FUSE-T 빌드)"),
                    ok: store.deps.ntfs3g != nil)
-            DepRow(name: "권한 헬퍼", desc: "설치 시 관리자 승인 없이 동작 (선택)",
+            DepRow(name: L("권한 헬퍼"), desc: L("설치 시 관리자 승인 없이 동작 (선택)"),
                    ok: store.helperInstalled)
 
             Divider()
 
             if !store.helperInstalled {
-                Text("권한 헬퍼를 설치하면 마운트/복구 시 비밀번호 입력이 생략됩니다. 최초 1회만 관리자 승인이 필요합니다.")
+                Text(L("권한 헬퍼를 설치하면 마운트/복구 시 비밀번호 입력이 생략됩니다. 최초 1회만 관리자 승인이 필요합니다."))
                     .font(.callout).foregroundStyle(.secondary)
-                Button("권한 헬퍼 설치") { store.installHelper() }
+                Button(L("권한 헬퍼 설치")) { store.installHelper() }
             }
 
-            Text("터미널에서 직접 설치:")
+            Text(L("터미널에서 직접 설치:"))
                 .font(.callout).bold()
             CodeBlock("brew install --cask fuse-t\n" +
                       "brew tap <github-user>/ntfs-manager\n" +
                       "brew install ntfs-3g-fuset")
 
-            Text("또는 앱에서 자동 설치:")
+            Text(L("또는 앱에서 자동 설치:"))
                 .font(.callout).bold()
-            Button(installing ? "설치 중…" : "자동 설치 실행") {
+            Button(installing ? L("설치 중…") : L("자동 설치 실행")) {
                 runInstaller()
             }
             .disabled(installing)
@@ -55,7 +55,7 @@ struct SetupGuideView: View {
 
             HStack {
                 Spacer()
-                Button("닫기") { dismiss() }
+                Button(L("닫기")) { dismiss() }
             }
         }
         .padding(20)
@@ -93,7 +93,7 @@ struct DepRow: View {
                 Text(desc).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(ok ? "설치됨" : "미설치").font(.caption)
+            Text(ok ? L("설치됨") : L("미설치")).font(.caption)
                 .foregroundStyle(ok ? .green : .red)
         }
     }

@@ -11,6 +11,10 @@ final class VolumeStore: ObservableObject {
     @Published var lastError: String?
     @Published var lastInfo: String?
     @Published var helperInstalled = false
+    /// ""=시스템 언어, "ko", "en" — 앱 내 언어 오버라이드
+    @Published var appLanguage: String {
+        didSet { UserDefaults.standard.set(appLanguage, forKey: "appLanguage") }
+    }
 
     private let monitor = DiskMonitor()
     private let service = MountService()
@@ -22,6 +26,7 @@ final class VolumeStore: ObservableObject {
     }
 
     init() {
+        appLanguage = UserDefaults.standard.string(forKey: "appLanguage") ?? ""
         monitor.onChange = { [weak self] in
             Task { @MainActor in self?.refresh() }
         }
@@ -95,8 +100,8 @@ final class VolumeStore: ObservableObject {
         guard let err = e as? NTFSManagerError else { return e.localizedDescription }
         switch err {
         case .dependencyMissing(let d): return fmt("%@이(가) 설치되어 있지 않습니다", d)
-        case .unmountFailed(let m): return fmt("언마운트 실패 — %@", m)
-        case .mountFailed(let m): return fmt("마운트 실패 — %@", m)
+        case .unmountFailed(let m): return fmt("언마운트 실패 — %@", L(m))
+        case .mountFailed(let m): return fmt("마운트 실패 — %@", L(m))
         case .hibernated: return L("Windows가 최대절전/빠른시작 상태로 종료된 볼륨입니다. Windows에서 완전히 종료 후 다시 연결하세요.")
         case .needsRepair: return L("볼륨이 dirty 상태입니다. 복구(ntfsfix)를 실행하거나 Windows에서 chkdsk를 실행하세요.")
         case .permissionDenied: return L("디스크 접근이 거부됐습니다. 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에서 ntfs-3g와 이 앱을 허용하세요.")
@@ -105,9 +110,16 @@ final class VolumeStore: ObservableObject {
     }
 }
 
-/// 앱 번들 로컬라이즈 — 키는 한국어 원문
+/// 앱 번들 로컬라이즈 — 키는 한국어 원문.
+/// appLanguage 오버라이드가 있으면 해당 lproj 번들을 직접 조회한다 (즉시 전환, 재시작 불필요).
 func L(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
+    let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? ""
+    guard !lang.isEmpty else { return NSLocalizedString(key, comment: "") }
+    if let path = Bundle.main.path(forResource: lang, ofType: "lproj"),
+       let b = Bundle(path: path) {
+        return b.localizedString(forKey: key, value: nil, table: nil)
+    }
+    return key
 }
 func fmt(_ key: String, _ args: CVarArg...) -> String {
     String(format: L(key), arguments: args)
