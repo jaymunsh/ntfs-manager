@@ -98,11 +98,14 @@ public final class DiskMonitor {
         guard let res = try? CommandRunner.run("/usr/bin/pgrep", ["-fl", "ntfs-3g"]),
               res.exitCode == 0 else { return nil }
         for line in res.stdout.split(separator: "\n") {
-            guard line.contains("/dev/\(deviceId)") else { continue }
-            let parts = line.split(separator: " ").map(String.init)
-            if let devIdx = parts.firstIndex(of: "/dev/\(deviceId)"), parts.count > devIdx + 1 {
-                return parts[devIdx + 1]
-            }
+            // "ntfs-3g /dev/diskXsY /Volumes/My Passport -o ..." — 마운트포인트에 공백이
+            // 있을 수 있으므로 디바이스 경로 뒤부터 " -o" 앞까지를 통째로 취한다
+            guard let devRange = line.range(of: "/dev/\(deviceId) ") else { continue }
+            let rest = line[devRange.upperBound...]
+            let mp = rest.range(of: " -o").map { String(rest[..<$0.lowerBound]) }
+                ?? String(rest)
+            let trimmed = mp.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty { return trimmed }
         }
         return nil
     }

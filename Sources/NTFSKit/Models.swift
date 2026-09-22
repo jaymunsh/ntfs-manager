@@ -27,5 +27,6 @@ public enum NTFSManagerError: Error, Equatable, Sendable {
     case mountFailed(String)
     case hibernated
     case needsRepair
+    case permissionDenied      // Full Disk Access 필요
     case cancelled
 }

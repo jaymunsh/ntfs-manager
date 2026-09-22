@@ -21,6 +21,7 @@ func fail(_ e: Error) -> Never {
         case .mountFailed(let m): msg = "마운트 실패: \(m)"
         case .hibernated: msg = "Windows hibernation/fast-startup 상태 볼륨"
         case .needsRepair: msg = "dirty 볼륨 — ntfsfix 또는 Windows chkdsk 필요"
+        case .permissionDenied: msg = "디스크 접근 거부 — 이 터미널/앱에 전체 디스크 접근 권한(Full Disk Access) 필요"
         case .cancelled: msg = "취소됨"
         }
     } else { msg = e.localizedDescription }

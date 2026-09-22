@@ -34,6 +34,9 @@ struct ContentView: View {
                 Text("백엔드: ntfs-3g + FUSE-T")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                Button("디스크 권한 설정") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+                }
                 Button("새로고침") { store.refresh() }
                     .keyboardShortcut("r", modifiers: .command)
             }

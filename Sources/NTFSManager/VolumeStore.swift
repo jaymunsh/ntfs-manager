@@ -55,6 +55,7 @@ final class VolumeStore: ObservableObject {
         case .mountFailed(let m): return "마운트 실패 — \(m)"
         case .hibernated: return "Windows가 최대절전/빠른시작 상태로 종료된 볼륨입니다. Windows에서 완전히 종료 후 다시 연결하세요."
         case .needsRepair: return "볼륨이 dirty 상태입니다. 복구(ntfsfix)를 실행하거나 Windows에서 chkdsk를 실행하세요."
+        case .permissionDenied: return "디스크 접근이 거부됐습니다. 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에서 ntfs-3g와 이 앱을 허용하세요."
         case .cancelled: return "사용자가 취소했습니다"
         }
     }

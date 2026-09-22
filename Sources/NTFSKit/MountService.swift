@@ -49,7 +49,7 @@ public final class MountService: Sendable {
         //    디바이스가 유저 쓰기 가능하면(disk image 등) root 불필요 — 직접 실행.
         //    실제 물리 디스크(/dev/disk* root:operator)만 관리자 권한 사용.
         let uid = getuid(), gid = getgid()
-        let opts = "local,allow_other,auto_xattr,auto_cache,noatime,windows_names,streams_interface=openxattr,inherit,uid=\(uid),gid=\(gid),volname=\(v.displayName)"
+        let opts = "local,allow_other,auto_xattr,auto_cache,noatime,windows_names,streams_interface=openxattr,inherit,recover,uid=\(uid),gid=\(gid),volname=\(v.displayName)"
         var envPrefix = "HOME=\"\(NSHomeDirectory())\" "
         if let prefix = Diagnostics.fuseTPrefix {
             envPrefix += "FUSE_NFSSRV_PATH=\"\(prefix)/bin/go-nfsv4\" "
@@ -57,7 +57,11 @@ public final class MountService: Sendable {
         let logPath = needsRoot ? "/var/log/ntfs-manager.log" : "\(NSHomeDirectory())/Library/Logs/ntfs-manager.log"
         try? FileManager.default.createDirectory(
             atPath: (logPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \(opts) </dev/null >\"\(logPath)\" 2>&1 &"
+        // 이전 실패 로그가 판정을 오염시키지 않도록 둘 다 비운다
+        for p in [logPath, NSHomeDirectory() + "/Library/Logs/ntfs-manager.log", "/var/log/ntfs-manager.log"] {
+            try? "".write(toFile: p, atomically: true, encoding: .utf8)
+        }
+        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \"\(opts)\" </dev/null >\"\(logPath)\" 2>&1 &"
         let res: CommandResult
         if needsRoot {
             res = try runner.runAsRoot(cmd)
@@ -77,6 +81,13 @@ public final class MountService: Sendable {
         }
         if !mounted {
             let log = Self.recentMountLog()
+            // 실패 시 만들어둔 빈 마운트포인트 디렉토리 정리
+            if Self.isEmptyDir(mountPoint) {
+                if needsRoot {
+                    try? runner.runAsRoot("rmdir \"\(mountPoint)\"")
+                }
+                try? FileManager.default.removeItem(atPath: mountPoint)
+            }
             if let err = Diagnostics.classify(ntfs3gStderr: log) { throw err }
             throw NTFSManagerError.mountFailed(log.isEmpty ? "ntfs-3g 마운트 실패" : log)
         }
@@ -126,7 +137,9 @@ public final class MountService: Sendable {
         }
         let res = try runner.runAsRoot("\"\(ntfsfix)\" \"\(v.devicePath)\"")
         guard res.exitCode == 0 else {
-            throw NTFSManagerError.mountFailed(res.stderr.isEmpty ? res.stdout : res.stderr)
+            let out = res.stderr.isEmpty ? res.stdout : res.stderr
+            if let err = Diagnostics.classify(ntfs3gStderr: out) { throw err }
+            throw NTFSManagerError.mountFailed(out)
         }
     }
 

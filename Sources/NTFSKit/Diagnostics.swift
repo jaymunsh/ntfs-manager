@@ -61,8 +61,12 @@ public enum Diagnostics {
         if s.contains("hibernated") || s.contains("fast startup") || s.contains("windows is hibernated") {
             return .hibernated
         }
+        // EPERM(raw device 접근 거부)을 먼저 검사 — TCC/FDA가 근본 원인인 경우가 많다
+        if s.contains("operation not permitted") || s.contains("permission denied") {
+            return .permissionDenied
+        }
         if s.contains("unclean shutdown") || s.contains("run chkdsk") || s.contains("volume is dirty")
-            || s.contains("mark for chkdsk") || s.contains("corrupt") {
+            || s.contains("mark for chkdsk") || s.contains("corrupt") || s.contains("unsafe state") {
             return .needsRepair
         }
         return nil
