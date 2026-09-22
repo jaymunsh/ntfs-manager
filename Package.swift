@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "ntfs-manager",
+    defaultLocalization: "ko",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "NTFSKit", targets: ["NTFSKit"]),
@@ -21,7 +22,12 @@ let package = Package(
         .executableTarget(
             name: "ntfs-cli",
             dependencies: ["NTFSKit"],
-            path: "Sources/ntfs-cli"
+            path: "Sources/ntfs-cli",
+            resources: [.process("Resources")]
+        ),
+        .executableTarget(
+            name: "ntfs-helper",
+            path: "Sources/ntfs-helper"
         ),
     ]
 )

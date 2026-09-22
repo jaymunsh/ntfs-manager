@@ -4,7 +4,7 @@ import Foundation
 public final class MountService: Sendable {
     private let runner: PrivilegedRunner
 
-    public init(runner: PrivilegedRunner = OsascriptRunner()) {
+    public init(runner: PrivilegedRunner = AutoRunner()) {
         self.runner = runner
     }
 
@@ -41,7 +41,7 @@ public final class MountService: Sendable {
             mountPoint = "\(base) \(n)"
         }
         if needsRoot {
-            try? runner.runAsRoot("mkdir -p \"\(mountPoint)\"")
+            _ = try? runner.run(.mkdir(mountPoint))
         }
         try FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: true)
 
@@ -50,23 +50,32 @@ public final class MountService: Sendable {
         //    실제 물리 디스크(/dev/disk* root:operator)만 관리자 권한 사용.
         let uid = getuid(), gid = getgid()
         let opts = "local,allow_other,auto_xattr,auto_cache,noatime,windows_names,streams_interface=openxattr,inherit,recover,uid=\(uid),gid=\(gid),volname=\(v.displayName)"
-        var envPrefix = "HOME=\"\(NSHomeDirectory())\" "
+        var env: [String: String] = ["HOME": NSHomeDirectory()]
         if let prefix = Diagnostics.fuseTPrefix {
-            envPrefix += "FUSE_NFSSRV_PATH=\"\(prefix)/bin/go-nfsv4\" "
+            env["FUSE_NFSSRV_PATH"] = "\(prefix)/bin/go-nfsv4"
         }
         let logPath = needsRoot ? "/var/log/ntfs-manager.log" : "\(NSHomeDirectory())/Library/Logs/ntfs-manager.log"
         try? FileManager.default.createDirectory(
             atPath: (logPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         // 이전 실패 로그가 판정을 오염시키지 않도록 둘 다 비운다
-        for p in [logPath, NSHomeDirectory() + "/Library/Logs/ntfs-manager.log", "/var/log/ntfs-manager.log"] {
-            try? "".write(toFile: p, atomically: true, encoding: .utf8)
+        let userLog = NSHomeDirectory() + "/Library/Logs/ntfs-manager.log"
+        try? "".write(toFile: userLog, atomically: true, encoding: .utf8)
+        if needsRoot {
+            _ = try? runner.run(.clearLog("/var/log/ntfs-manager.log"))
+        } else {
+            try? "".write(toFile: "/var/log/ntfs-manager.log", atomically: true, encoding: .utf8)
         }
-        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \"\(opts)\" </dev/null >\"\(logPath)\" 2>&1 &"
+
         let res: CommandResult
         if needsRoot {
-            res = try runner.runAsRoot(cmd)
+            res = try runner.run(.spawn(path: ntfs3g,
+                                        args: [v.devicePath, mountPoint, "-o", opts],
+                                        env: env, log: logPath))
         } else {
-            res = try CommandRunner.run("/bin/sh", ["-c", cmd])
+            // 유저 마운트: 로컬에서 직접 백그라운드 실행
+            res = Self.spawnLocal(path: ntfs3g,
+                                  args: [v.devicePath, mountPoint, "-o", opts],
+                                  env: env, log: logPath)
         }
         guard res.exitCode == 0 else {
             throw NTFSManagerError.mountFailed(res.stderr.isEmpty ? res.stdout : res.stderr)
@@ -83,9 +92,7 @@ public final class MountService: Sendable {
             let log = Self.recentMountLog()
             // 실패 시 만들어둔 빈 마운트포인트 디렉토리 정리
             if Self.isEmptyDir(mountPoint) {
-                if needsRoot {
-                    try? runner.runAsRoot("rmdir \"\(mountPoint)\"")
-                }
+                if needsRoot { _ = try? runner.run(.rmdir(mountPoint)) }
                 try? FileManager.default.removeItem(atPath: mountPoint)
             }
             if let err = Diagnostics.classify(ntfs3gStderr: log) { throw err }
@@ -130,8 +137,12 @@ public final class MountService: Sendable {
                                              options: .regularExpression)
         try unmount(v)
         let r = try CommandRunner.run("/usr/sbin/diskutil", ["eject", "/dev/\(disk)"])
-        guard r.exitCode == 0 else {
-            throw NTFSManagerError.unmountFailed(r.stderr.isEmpty ? r.stdout : r.stderr)
+        if r.exitCode != 0 {
+            // 디스크 이미지(hdiutil attach)는 diskutil eject가 안 먹힘 → detach fallback
+            let d = try CommandRunner.run("/usr/bin/hdiutil", ["detach", "/dev/\(disk)"])
+            guard d.exitCode == 0 else {
+                throw NTFSManagerError.unmountFailed(r.stderr.isEmpty ? r.stdout : r.stderr)
+            }
         }
     }
 
@@ -140,7 +151,7 @@ public final class MountService: Sendable {
         guard let ntfsfix = Diagnostics.ntfsfixPath else {
             throw NTFSManagerError.dependencyMissing("ntfsfix")
         }
-        let res = try runner.runAsRoot("\"\(ntfsfix)\" \"\(v.devicePath)\"")
+        let res = try runner.run(.exec(path: ntfsfix, args: [v.devicePath]))
         guard res.exitCode == 0 else {
             let out = res.stderr.isEmpty ? res.stdout : res.stderr
             if let err = Diagnostics.classify(ntfs3gStderr: out) { throw err }
@@ -149,6 +160,30 @@ public final class MountService: Sendable {
     }
 
     // MARK: - helpers
+
+    /// 유저 권한으로 ntfs-3g 백그라운드 실행 (디스크 이미지 등 블록 디바이스가 아닌 경우)
+    static func spawnLocal(path: String, args: [String], env: [String: String], log: String) -> CommandResult {
+        FileManager.default.createFile(atPath: log, contents: nil)
+        guard let fh = FileHandle(forWritingAtPath: log) else {
+            return CommandResult(exitCode: 1, stdout: "", stderr: "cannot open log")
+        }
+        fh.seekToEndOfFile()
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = args
+        var e = ProcessInfo.processInfo.environment
+        for (k, v) in env { e[k] = v }
+        p.environment = e
+        p.standardOutput = fh; p.standardError = fh
+        p.standardInput = FileHandle.nullDevice
+        do {
+            try p.run()
+            Thread.detachNewThread { p.waitUntilExit() }   // 좀비 방지
+            return CommandResult(exitCode: 0, stdout: "spawned", stderr: "")
+        } catch {
+            return CommandResult(exitCode: 1, stdout: "", stderr: error.localizedDescription)
+        }
+    }
 
     static func isBusy(_ output: String) -> Bool {
         let s = output.lowercased()

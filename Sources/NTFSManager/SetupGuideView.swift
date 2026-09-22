@@ -19,8 +19,16 @@ struct SetupGuideView: View {
                    ok: store.deps.fuseT)
             DepRow(name: "ntfs-3g", desc: "NTFS 읽기/쓰기 드라이버 (FUSE-T 빌드)",
                    ok: store.deps.ntfs3g != nil)
+            DepRow(name: "권한 헬퍼", desc: "설치 시 관리자 승인 없이 동작 (선택)",
+                   ok: store.helperInstalled)
 
             Divider()
+
+            if !store.helperInstalled {
+                Text("권한 헬퍼를 설치하면 마운트/복구 시 비밀번호 입력이 생략됩니다. 최초 1회만 관리자 승인이 필요합니다.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button("권한 헬퍼 설치") { store.installHelper() }
+            }
 
             Text("터미널에서 직접 설치:")
                 .font(.callout).bold()

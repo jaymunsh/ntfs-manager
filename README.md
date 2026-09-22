@@ -4,10 +4,12 @@ macOS(Apple Silicon)에서 NTFS 볼륨을 **읽기/쓰기**로 관리하는 유�
 백엔드: [FUSE-T](https://www.fuse-t.org/) (kextless FUSE) + [ntfs-3g](https://github.com/macos-fuse-t/ntfs-3g).
 
 - 커널 확장(kext) 없음 → Reduced Security 불필요
-- Dock 앱(SwiftUI) + CLI(`ntfs-cli`) 제공
+- Dock 앱(SwiftUI) + CLI(`ntfs-cli`) 제공 — 한국어/English 지원
 - **설치 과정 전체가 sudo 불필요** — FUSE-T는 유저스페이스(`~/.fuse-t`)에 설치
-- 실제 디스크 RW 마운트 시에만 관리자 권한 프롬프트 1회 (raw device 접근)
+- **권한 헬퍼(선택)**: 1회 설치 시 이후 마운트/복구가 관리자 승인 없이 동작.
+  미설치 시 osascript 관리자 프롬프트로 폴백
 - 물리 디스크 사용 시 **전체 디스크 접근 권한(Full Disk Access)** 필요 — 아래 참조
+- 자동 마운트 옵션 + macOS 알림 지원
 
 ## 요구사항
 
@@ -48,9 +50,25 @@ NTFS 드라이브를 연결하면 목록에 표시됩니다. macOS가 읽기전�
 .build/release/ntfs-cli unmount disk4s2
 .build/release/ntfs-cli eject disk4s2
 .build/release/ntfs-cli repair disk4s2     # ntfsfix
+.build/release/ntfs-cli install-helper     # 권한 헬퍼 설치 (1회 관리자 승인)
 ```
 
-실제 디스크 마운트 시 관리자 권한 프롬프트가 뜹니다
+### 권한 헬퍼
+
+`ntfs-helper`는 launchd 데몬으로 `/var/run/ntfs-manager-helper.sock`
+(root:admin 0660)를 통해 검증된 디스크 작업만 실행합니다 — 임의 셸 명령은
+받지 않으며, 실행 바이너리(diskutil/ntfs-3g/ntfsfix/umount)와 인자 형식
+(`/dev/diskNsM`, `/Volumes/*`)을 화이트리스트로 검증합니다. 설치는 앱의
+설치 가이드 또는 `ntfs-cli install-helper`로, 관리자 승인은 최초 1회입니다.
+제거하려면:
+
+```bash
+sudo launchctl bootout system/com.leneu.ntfs-manager.helper
+sudo rm /Library/LaunchDaemons/com.leneu.ntfs-manager.helper.plist \
+        /Library/PrivilegedHelperTools/ntfs-manager-helper
+```
+
+헬퍼 미설치 시 실제 디스크 마운트마다 관리자 권한 프롬프트가 뜹니다
 (ntfs-3g가 `/dev/diskXsY` 쓰기 접근에 root 필요 — 파일시스템 스택 자체는 유저스페이스).
 
 ### 전체 디스크 접근 권한 (필수)
@@ -75,7 +93,8 @@ macOS의 TCC 때문에 root 권한과 별개로, 물리 디스크의 raw device 
 - dirty 볼륨은 마운트 시 ntfs-3g `recover`로 저널 복구를 자동 시도하고,
   그래도 거부되면 "복구"(ntfsfix) 또는 Windows의 chkdsk가 필요합니다.
 - FUSE-T는 NFS loopback 방식이라 대용량 파일 성능이 네이티브보다 낮을 수 있습니다.
-- 검증됨: NTFS 이미지 파일에서 마운트·읽기·쓰기·언마운트 라운드트립 동작 확인.
+- 검증됨: NTFS 이미지 + 실제 2TB WD My Passport 드라이브에서 감지·R/W 마운트·
+  쓰기·언마운트·제거 확인 (헬퍼 경로 포함).
 
 ## 라이선스
 

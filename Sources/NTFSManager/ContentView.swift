@@ -4,6 +4,7 @@ import NTFSKit
 struct ContentView: View {
     @EnvironmentObject var store: VolumeStore
     @State private var showSetup = false
+    @AppStorage("autoMountRW") private var autoMount = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +40,10 @@ struct ContentView: View {
             HStack {
                 Text("백엔드: ntfs-3g + FUSE-T")
                     .font(.caption).foregroundStyle(.secondary)
+                Toggle("자동 마운트", isOn: $autoMount)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+                    .help("NTFS 드라이브 연결 시 자동으로 읽기/쓰기 마운트")
                 Spacer()
                 Button("디스크 권한 설정") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)

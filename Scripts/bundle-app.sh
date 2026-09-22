@@ -8,14 +8,20 @@ BINARY=ntfs-manager
 VERSION=0.1.0
 
 cd "$REPO_ROOT"
-swift build -c release --product "$BINARY"
+swift build -c release --product "$BINARY" --product ntfs-helper
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp ".build/release/$BINARY" "$APP/Contents/MacOS/NTFSManager"
+# 권한 헬퍼 — 사용자가 앱에서 1회 관리자 승인으로 설치할 수 있도록 동봉
+cp ".build/release/ntfs-helper" "$APP/Contents/MacOS/ntfs-helper" 2>/dev/null || true
 cp "$REPO_ROOT/Scripts/install-deps.sh" "$APP/Contents/Resources/" 2>/dev/null || true
 [ -f "$REPO_ROOT/Resources/AppIcon.icns" ] && cp "$REPO_ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/"
+# 로컬라이제이션 (ko는 리터럴 키 자체가 한국어 — en.lproj만 배포)
+for lproj in "$REPO_ROOT"/Resources/*.lproj; do
+    [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
