@@ -8,6 +8,7 @@ final class VolumeStore: ObservableObject {
     @Published var deps = Diagnostics.DependencyStatus(fuseT: false, ntfs3g: nil, ntfsfix: nil)
     @Published var busyVolumeIDs: Set<String> = []
     @Published var lastError: String?
+    @Published var lastInfo: String?
 
     private let monitor = DiskMonitor()
     private let service = MountService()
@@ -25,9 +26,11 @@ final class VolumeStore: ObservableObject {
         volumes = monitor.scan()
     }
 
-    func run(_ id: String, _ label: String, _ action: @escaping @Sendable () throws -> Void) {
+    func run(_ id: String, _ label: String, info: String? = nil,
+             _ action: @escaping @Sendable () throws -> Void) {
         busyVolumeIDs.insert(id)
         lastError = nil
+        lastInfo = nil
         Task.detached { [weak self] in
             var errorText: String?
             do { try action() } catch {
@@ -36,16 +39,17 @@ final class VolumeStore: ObservableObject {
             await MainActor.run {
                 self?.busyVolumeIDs.remove(id)
                 self?.lastError = errorText
+                if errorText == nil { self?.lastInfo = info }
                 self?.refresh()
             }
         }
     }
 
-    func mountRW(_ v: Volume)   { let s = service; run(v.id, "쓰기 마운트") { try s.mountReadWrite(v) } }
-    func mountRO(_ v: Volume)   { let s = service; run(v.id, "읽기 마운트") { try s.mountReadOnly(v) } }
-    func unmount(_ v: Volume)   { let s = service; run(v.id, "언마운트") { try s.unmount(v) } }
-    func eject(_ v: Volume)     { let s = service; run(v.id, "제거") { try s.eject(v) } }
-    func repair(_ v: Volume)    { let s = service; run(v.id, "복구") { try s.repair(v) } }
+    func mountRW(_ v: Volume)   { let s = service; run(v.id, "쓰기 마운트", info: "\(v.displayName) 읽기/쓰기로 마운트됨") { try s.mountReadWrite(v) } }
+    func mountRO(_ v: Volume)   { let s = service; run(v.id, "읽기 마운트", info: "\(v.displayName) 읽기 전용으로 마운트됨") { try s.mountReadOnly(v) } }
+    func unmount(_ v: Volume)   { let s = service; run(v.id, "언마운트", info: "\(v.displayName) 언마운트됨") { try s.unmount(v) } }
+    func eject(_ v: Volume)     { let s = service; run(v.id, "제거", info: "\(v.displayName) 안전하게 제거됨 — 이제 케이블을 뽑아도 됩니다") { try s.eject(v) } }
+    func repair(_ v: Volume)    { let s = service; run(v.id, "복구", info: "\(v.displayName) 복구 완료") { try s.repair(v) } }
 
     nonisolated static func describe(_ e: Error) -> String {
         guard let err = e as? NTFSManagerError else { return e.localizedDescription }

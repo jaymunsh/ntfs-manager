@@ -28,6 +28,12 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let info = store.lastInfo {
+                Text(info)
+                    .font(.callout)
+                    .foregroundStyle(.green)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack {
