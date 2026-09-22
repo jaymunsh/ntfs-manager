@@ -15,14 +15,14 @@ class Ntfs3gFuset < Formula
   depends_on :macos
 
   def install
-    # FUSE-T 기본 설치 경로. 개발/테스트용으로 NTFS3G_FUSET_PREFIX 오버라이드 가능.
-    fuset_prefix = ENV["NTFS3G_FUSET_PREFIX"] || "/usr/local"
+    # FUSE-T 설치 경로: 시스템(/usr/local) 또는 유저스페이스(~/.fuse-t/usr/local)
+    fuset_prefix = ["/usr/local", "#{Dir.home}/.fuse-t/usr/local"].find do |p|
+      Dir.glob("#{p}/lib/libfuse-t*.dylib").any?
+    end
+    odie "FUSE-T가 설치되어 있지 않습니다. `Scripts/install-deps.sh` 또는 `brew install --cask fuse-t`를 실행하세요." unless fuset_prefix
+
     fuset_lib = "#{fuset_prefix}/lib"
     fuset_include = "#{fuset_prefix}/include/fuse"
-
-    unless File.exist?("#{fuset_lib}/libfuse-t.dylib") || File.exist?("#{fuset_lib}/libfuse-t-1.2.7.dylib")
-      odie "FUSE-T가 설치되어 있지 않습니다. 먼저 `brew install --cask fuse-t`를 실행하세요."
-    end
 
     ENV.append "CPPFLAGS", "-I#{fuset_include}"
     ENV.append "LDFLAGS", "-L#{fuset_lib} -lfuse-t -Wl,-rpath,#{fuset_lib} -Wl,-rpath,/usr/local/lib -lintl"

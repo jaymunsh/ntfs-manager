@@ -36,9 +36,14 @@ public final class MountService: Sendable {
         try FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: true)
 
         // 3) ntfs-3g를 root로 백그라운드 실행
+        //    유저스페이스 FUSE-T는 FUSE_NFSSRV_PATH로 go-nfsv4 위치를 넘긴다
         let uid = getuid(), gid = getgid()
         let opts = "local,allow_other,auto_xattr,auto_cache,noatime,windows_names,streams_interface=openxattr,inherit,uid=\(uid),gid=\(gid),volname=\(v.displayName)"
-        let cmd = "\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \(opts) </dev/null >/var/log/ntfs-manager.log 2>&1 &"
+        var envPrefix = "HOME=\"\(NSHomeDirectory())\" "
+        if let prefix = Diagnostics.fuseTPrefix {
+            envPrefix += "FUSE_NFSSRV_PATH=\"\(prefix)/bin/go-nfsv4\" "
+        }
+        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \(opts) </dev/null >/var/log/ntfs-manager.log 2>&1 &"
         let res = try runner.runAsRoot(cmd)
         guard res.exitCode == 0 else {
             throw NTFSManagerError.mountFailed(res.stderr.isEmpty ? res.stdout : res.stderr)

@@ -14,10 +14,23 @@ public enum Diagnostics {
         ntfs3gCandidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
+    /// FUSE-T 설치 경로 (시스템 또는 유저스페이스)
+    public static var fuseTPrefix: String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        for p in ["/usr/local", "\(home)/.fuse-t/usr/local"] {
+            let libs = (try? FileManager.default.contentsOfDirectory(atPath: "\(p)/lib")) ?? []
+            if libs.contains(where: { $0.hasPrefix("libfuse-t") && $0.hasSuffix(".dylib") }) {
+                return p
+            }
+        }
+        return nil
+    }
+
     public static var fuseTInstalled: Bool {
-        FileManager.default.fileExists(atPath: "/Library/Application Support/fuse-t")
-            || FileManager.default.fileExists(atPath: "/usr/local/lib/libfuse-t.dylib")
-            || (try? CommandRunner.run("/usr/bin/pgrep", ["-f", "fuse-t"]))?.exitCode == 0
+        fuseTPrefix != nil
+            || FileManager.default.fileExists(
+                atPath: FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support/fuse-t").path)
     }
 
     public static var ntfsfixPath: String? {
