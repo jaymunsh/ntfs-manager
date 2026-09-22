@@ -80,22 +80,37 @@ NSColor(white: 0.15, alpha: 0.8).setStroke()
 hub.lineWidth = size * 0.006
 hub.stroke()
 
-// 읽기 암 (액추에이터) — 우하단에서 플래터를 향해
-let armPath = NSBezierPath()
-armPath.move(to: NSPoint(x: cx + platterR * 0.95, y: cy - platterR * 0.95))
-armPath.line(to: NSPoint(x: cx + platterR * 0.30, y: cy - platterR * 0.30))
-NSColor(red: 0.75, green: 0.78, blue: 0.85, alpha: 0.95).setStroke()
-armPath.lineWidth = size * 0.030
-armPath.lineCapStyle = .round
-armPath.stroke()
+// 읽기 암 (액추에이터) — 우하단 피벗에서 플래터 가장자리를 향한 쐐기 형태
+let pivot = NSPoint(x: cx + platterR * 0.92, y: cy - platterR * 0.92)
+let tip   = NSPoint(x: cx + platterR * 0.28, y: cy - platterR * 0.28)
+let arm = NSBezierPath()
+arm.move(to: NSPoint(x: tip.x - size * 0.014, y: tip.y + size * 0.014))
+arm.line(to: NSPoint(x: tip.x + size * 0.014, y: tip.y - size * 0.014))
+arm.line(to: NSPoint(x: pivot.x + size * 0.045, y: pivot.y + size * 0.010))
+arm.line(to: NSPoint(x: pivot.x + size * 0.010, y: pivot.y + size * 0.045))
+arm.close()
+NSColor(red: 0.62, green: 0.66, blue: 0.74, alpha: 1).setFill()
+arm.fill()
+NSColor(white: 0.15, alpha: 0.6).setStroke()
+arm.lineWidth = size * 0.004
+arm.stroke()
 
-// 암 끝 헤드
-let headR = size * 0.035
-let head = NSBezierPath(ovalIn: CGRect(x: cx + platterR * 0.30 - headR,
-                                       y: cy - platterR * 0.30 - headR,
-                                       width: headR * 2, height: headR * 2))
-NSColor(red: 0.95, green: 0.55, blue: 0.20, alpha: 1).setFill()
-head.fill()
+// 피벗 베어링
+let pivR = size * 0.038
+let pivotCircle = NSBezierPath(ovalIn: CGRect(x: pivot.x - pivR, y: pivot.y - pivR,
+                                             width: pivR * 2, height: pivR * 2))
+let pivGrad = NSGradient(colors: [
+    NSColor(red: 0.80, green: 0.83, blue: 0.89, alpha: 1),
+    NSColor(red: 0.45, green: 0.49, blue: 0.58, alpha: 1),
+])!
+pivGrad.draw(in: pivotCircle, angle: 90)
+NSColor(white: 0.15, alpha: 0.7).setStroke()
+pivotCircle.lineWidth = size * 0.005
+pivotCircle.stroke()
+let pivDotR = pivR * 0.35
+NSColor(white: 0.12, alpha: 0.9).setFill()
+NSBezierPath(ovalIn: CGRect(x: pivot.x - pivDotR, y: pivot.y - pivDotR,
+                            width: pivDotR * 2, height: pivDotR * 2)).fill()
 
 // --- "NTFS" 텍스트 ---
 let font = NSFont.systemFont(ofSize: size * 0.16, weight: .heavy)
