@@ -59,6 +59,81 @@ NFS 클라이언트가 마운트하는 구조라 kextless로 동작한다. ntfs-
 localhost:/My Passport on /Volumes/My Passport (nfs)
 ```
 
+## 선택한 기술들 — 각각 뭐고 왜 썼나
+
+### ntfs-3g — NTFS 읽기/쓰기 엔진
+
+Tuxera가 만든 오픈소스 NTFS 드라이버(GPL-2.0+/LGPL). 리눅스 배포판들이
+수십 년간 써온 검증된 구현체로, MFT·저널($LogFile)·보안 디스크립터 같은
+NTFS 내부 구조를 전부 이해한다. 우리 앱은 파일시스템 로직을 직접 구현하지
+않고 ntfs-3g를 서브프로세스로 실행한다 — GPL 바이너리를 링크하지 않고
+프로세스 경계로 분리해서 우리 코드는 MIT로 둘 수 있었다. 함께 오는
+`ntfsfix`(dirty 플래그/저널 리셋)는 앱의 "복구" 버튼이 호출한다.
+
+### FUSE-T — kext 없는 FUSE
+
+FUSE는 커널 파일시스템 코드를 유저 프로세스로 옮기는 프레임워크인데,
+고전적 구현인 macFUSE는 커널 확장이 필요하다 — Apple Silicon에서는
+Reduced Security까지 내려야 해서 배제했다. FUSE-T는 커널 확장 대신
+**로컬 NFS v4 서버**(go-nfsv4)를 띄우고 macOS 내장 NFS 클라이언트가
+마운트하는 방식이다. 성능은 커널 FUSE보다 낮지만(NFS 왕복 오버헤드)
+보안 설정을 건드리지 않아 개인용 유틸리티엔 합리적인 트레이드오프였다.
+`FUSE_NFSSRV_PATH` 환경 변수로 유저스페이스 설치(`~/.fuse-t`)도 지원한다.
+
+### Swift + SwiftUI + SwiftPM
+
+앱/CLI 전부 Swift. UI는 Dock에 뜨는 WindowGroup 기반 SwiftUI로 최소한의
+코드로 볼륨 목록·버튼·배너를 구성했다. Xcode가 없는 환경이라 IDE 프로젝트
+대신 **SwiftPM**(`Package.swift`)으로 멀티 타겟을 구성했다 — 라이브러리
+`NTFSKit`, 앱 `NTFSManager`, CLI `ntfs-cli`, 데몬 `ntfs-helper` 4개 타겟이
+같은 소스 트리에서 빌드된다. `.app` 번들은 `bundle-app.sh`가 Info.plist,
+아이콘, lproj, 헬퍼 바이너리를 수동으로 조립해 만든다.
+
+### DiskArbitration — 디스크 이벤트 감지
+
+macOS의 디스크 이벤트 프레임워크. `DASession`에 appeared/disappeared/
+descriptionChanged 콜백을 등록하면 드라이브를 꽂거나 뽑을 때 앱이 즉시
+알 수 있다 — 폴링 없이 목록이 자동 갱신된다. 실제 볼륨 정보는 콜백이
+올 때 `diskutil list -plist` + `diskutil info -plist`를 파싱해 채운다.
+
+### osascript — MVP 권한 상승
+
+`do shell script ... with administrator privileges`는 macOS가 내장한
+권한 상승 장치로, 실행할 때마다 관리자 승인 대화상자가 뜬다. 별도
+인프라 없이 root 명령을 띄울 수 있어 MVP엔 충분했지만, 매번 프롬프트가
+뜨는 게 불편해서 헬퍼 데몬으로 대체했다. 지금도 헬퍼 미설치 시 폴백으로
+남아있다.
+
+### launchd 데몬 + UNIX 도메인 소켓 — 권한 헬퍼
+
+"관리자 승인 1회" 이후 프롬프트 없이 디스크 작업을 하려면 root 데몬이
+필요하다. IPC로 XPC 대신 **UNIX 소켓**을 택한 이유: XPC/NSXPC는
+Mach 서비스라 클라이언트가 제대로 서명된 .app이어야 자연스럽고,
+CLI 바이너리가 같은 채널을 쓰기 어렵다. 소켓은 파일 권한
+(root:admin 0660)만으로 접근 제어가 되고, `ntfs-cli`에서도 똑같이 쓸 수
+있다. 보안은 소켓 권한 + 명령 화이트리스트 + 인자 정규식 검증의 3중으로.
+
+### TCC / Full Disk Access — 보이지 않는 벽
+
+macOS의 동의 프레임워크. root 권한과 완전히 별개로, 물리 디스크 raw
+device나 `~/Documents` 같은 보호 경로 접근은 "책임 프로세스"의 TCC 권한을
+요구한다. 이 프로젝트에서 가장 덜 문서화된 함정이었다 — root 셸이
+`/dev/disk4s1`을 열지 못하고, `~/Documents`의 빌드 산출물을 읽지 못한다.
+앱은 EPERM을 감지하면 설정 창으로 바로 안내한다.
+
+### hdiutil — 물리 디스크 없는 테스트
+
+실제 NTFS 드라이브가 없어도 `hdiutil create -layout GPTSPUD`로 GPT
+디스크 이미지를 만들고 attach하면 `/dev/diskNsM` 블록 디바이스가 생긴다.
+이미지 디바이스는 연 사용자 소유라 포맷도 가능하다 — 테스트 전체
+라이프사이클(감지→마운트→쓰기→제거)을 물리 하드웨어 없이 검증했다.
+
+### iconutil + CoreGraphics — 코드로 그리는 아이콘
+
+디자인 툴 없이 `make-icon.swift`가 CoreGraphics로 HDD 플래터+액추에이터
+암을 그려 PNG를 만들고, iconset→`iconutil`로 `AppIcon.icns`를 생성한다.
+아이콘 수정이 코드 diff로 리뷰되는 게 장점.
+
 ## 두 번째 함정: macOS용 ntfs-3g는 Homebrew에 없다
 
 `brew install ntfs-3g`는 실패한다 — homebrew-core의 ntfs-3g는
