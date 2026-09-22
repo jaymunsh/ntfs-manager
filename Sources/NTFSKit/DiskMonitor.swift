@@ -43,13 +43,17 @@ public final class DiskMonitor {
         for disk in all {
             guard let partitions = disk["Partitions"] as? [[String: Any]] else { continue }
             for part in partitions {
+                // GPT NTFS: Content="Microsoft Basic Data" / MBR NTFS: "Windows_NTFS"
+                // 실제 파일시스템 판별은 diskutil info의 FilesystemType=="ntfs"로 한다
                 guard let content = part["Content"] as? String,
-                      content.hasPrefix("Windows_NTFS"),
-                      let ident = part["DeviceIdentifier"] as? String else { continue }
+                      Self.ntfsCandidateContents.contains(content),
+                      let ident = part["DeviceIdentifier"] as? String,
+                      let info = Self.diskInfo(ident),
+                      (info["FilesystemType"] as? String) == "ntfs" else { continue }
 
-                let name = part["VolumeName"] as? String ?? ""
+                let name = info["VolumeName"] as? String ?? ""
                 let size = part["Size"] as? Int64 ?? 0
-                let mountPoint = part["MountPoint"] as? String ?? ""
+                let mountPoint = info["MountPoint"] as? String ?? ""
                 let removable = (disk["Internal"] as? Bool) == false
 
                 var v = Volume(
@@ -71,6 +75,21 @@ public final class DiskMonitor {
         }
         volumes = result
         return result
+    }
+
+    /// NTFS일 수 있는 파티션 Content 타입 (MBR/GPT 모두 커버)
+    static let ntfsCandidateContents: Set<String> = [
+        "Windows_NTFS", "Microsoft Basic Data", "Windows_Recovery", "Windows_LDM-metadata",
+    ]
+
+    static func diskInfo(_ ident: String) -> [String: Any]? {
+        guard let res = try? CommandRunner.run("/usr/sbin/diskutil",
+                                               ["info", "-plist", "/dev/\(ident)"]),
+              res.exitCode == 0,
+              let dict = try? PropertyListSerialization.propertyList(
+                  from: res.stdout.data(using: .utf8)!, format: nil) as? [String: Any]
+        else { return nil }
+        return dict
     }
 
     /// fuse-t(NFS loopback) 마운트 테이블에서 ntfs-3g가 잡은 마운트포인트를 찾는다.

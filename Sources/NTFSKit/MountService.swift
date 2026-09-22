@@ -26,25 +26,44 @@ public final class MountService: Sendable {
         }
 
         // 2) 마운트포인트 준비 (이름 충돌 시 suffix)
-        let base = "/Volumes/\(v.displayName)"
+        //    /Volumes는 root 전용이므로, 유저 마운트(이미지 등)는 ~/Library/ntfs-manager/Volumes
+        //    ntfs-3g는 블록 디바이스를 비특권 유저로 external FUSE 마운트하는 것을 거부 →
+        //    일반 파일(디스크 이미지)만 유저 마운트, 블록 디바이스는 항상 root
+        var st = stat()
+        let needsRoot = !(stat(v.devicePath, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG)
+        let baseDir = needsRoot ? "/Volumes"
+            : "\(NSHomeDirectory())/Library/ntfs-manager/Volumes"
+        let base = "\(baseDir)/\(v.displayName)"
         var mountPoint = base
         var n = 1
         while FileManager.default.fileExists(atPath: mountPoint), !Self.isEmptyDir(mountPoint) {
             n += 1
             mountPoint = "\(base) \(n)"
         }
+        if needsRoot {
+            try? runner.runAsRoot("mkdir -p \"\(mountPoint)\"")
+        }
         try FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: true)
 
-        // 3) ntfs-3g를 root로 백그라운드 실행
-        //    유저스페이스 FUSE-T는 FUSE_NFSSRV_PATH로 go-nfsv4 위치를 넘긴다
+        // 3) ntfs-3g 백그라운드 실행
+        //    디바이스가 유저 쓰기 가능하면(disk image 등) root 불필요 — 직접 실행.
+        //    실제 물리 디스크(/dev/disk* root:operator)만 관리자 권한 사용.
         let uid = getuid(), gid = getgid()
         let opts = "local,allow_other,auto_xattr,auto_cache,noatime,windows_names,streams_interface=openxattr,inherit,uid=\(uid),gid=\(gid),volname=\(v.displayName)"
         var envPrefix = "HOME=\"\(NSHomeDirectory())\" "
         if let prefix = Diagnostics.fuseTPrefix {
             envPrefix += "FUSE_NFSSRV_PATH=\"\(prefix)/bin/go-nfsv4\" "
         }
-        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \(opts) </dev/null >/var/log/ntfs-manager.log 2>&1 &"
-        let res = try runner.runAsRoot(cmd)
+        let logPath = needsRoot ? "/var/log/ntfs-manager.log" : "\(NSHomeDirectory())/Library/Logs/ntfs-manager.log"
+        try? FileManager.default.createDirectory(
+            atPath: (logPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        let cmd = "\(envPrefix)\"\(ntfs3g)\" \"\(v.devicePath)\" \"\(mountPoint)\" -o \(opts) </dev/null >\"\(logPath)\" 2>&1 &"
+        let res: CommandResult
+        if needsRoot {
+            res = try runner.runAsRoot(cmd)
+        } else {
+            res = try CommandRunner.run("/bin/sh", ["-c", cmd])
+        }
         guard res.exitCode == 0 else {
             throw NTFSManagerError.mountFailed(res.stderr.isEmpty ? res.stdout : res.stderr)
         }
@@ -91,7 +110,8 @@ public final class MountService: Sendable {
 
     /// 볼륨이 속한 전체 디스크를 제거(eject)한다.
     public func eject(_ v: Volume) throws {
-        let disk = v.id.components(separatedBy: "s").first ?? v.id
+        let disk = v.id.replacingOccurrences(of: #"s\d+$"#, with: "",
+                                             options: .regularExpression)
         try unmount(v)
         let r = try CommandRunner.run("/usr/sbin/diskutil", ["eject", "/dev/\(disk)"])
         guard r.exitCode == 0 else {
@@ -117,8 +137,17 @@ public final class MountService: Sendable {
     }
 
     static func recentMountLog() -> String {
-        guard let s = try? String(contentsOfFile: "/var/log/ntfs-manager.log", encoding: .utf8) else { return "" }
-        return String(s.split(separator: "\n").suffix(20).joined(separator: "\n"))
+        let paths = [
+            NSHomeDirectory() + "/Library/Logs/ntfs-manager.log",
+            "/var/log/ntfs-manager.log",
+        ]
+        var combined = ""
+        for p in paths {
+            if let s = try? String(contentsOfFile: p, encoding: .utf8) {
+                combined += s + "\n"
+            }
+        }
+        return String(combined.split(separator: "\n").suffix(20).joined(separator: "\n"))
     }
 
     static func mountLogContainsFailure() -> Bool {

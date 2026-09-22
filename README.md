@@ -5,7 +5,8 @@ macOS(Apple Silicon)에서 NTFS 볼륨을 **읽기/쓰기**로 관리하는 유�
 
 - 커널 확장(kext) 없음 → Reduced Security 불필요
 - Dock 앱(SwiftUI) + CLI(`ntfs-cli`) 제공
-- 무료 — Apple Developer 계정 불필요
+- **설치 과정 전체가 sudo 불필요** — FUSE-T는 유저스페이스(`~/.fuse-t`)에 설치
+- 실제 디스크 RW 마운트 시에만 관리자 권한 프롬프트 1회 (raw device 접근)
 
 ## 요구사항
 
@@ -17,18 +18,18 @@ macOS(Apple Silicon)에서 NTFS 볼륨을 **읽기/쓰기**로 관리하는 유�
 
 ```bash
 git clone <this-repo> && cd ntfs-manager
-./Scripts/install-deps.sh   # FUSE-T + ntfs-3g 설치 (관리자 비밀번호 필요)
+./Scripts/install-deps.sh   # FUSE-T(유저스페이스) + ntfs-3g — 비밀번호 없이 설치
 ./Scripts/bundle-app.sh     # build/NTFSManager.app 생성
 open build/NTFSManager.app
 ```
 
-수동 설치:
+내부 동작:
+1. `brew fetch --cask fuse-t`로 pkg를 받아 페이로드를 `~/Library/Application Support/fuse-t`와
+   `~/.fuse-t`에 풀어놓습니다 (brew의 sudo pkg 설치 대신 postinstall의 non-root 경로 재현)
+2. 이 repo를 로컬 tap으로 등록하고 `ntfs-3g-fuset` formula를 빌드해 `/opt/homebrew`에 설치
 
-```bash
-brew install --cask fuse-t
-brew tap <github-user>/ntfs-manager   # repo가 tap 형식(Formula/ 포함)
-brew install ntfs-3g-fuset
-```
+GitHub에 올라간 후에는: `brew install --cask fuse-t` 또는 위 스크립트,
+`brew tap <user>/ntfs-manager && brew install ntfs-3g-fuset`
 
 ## 사용
 
@@ -48,7 +49,8 @@ NTFS 드라이브를 연결하면 목록에 표시됩니다. macOS가 읽기전�
 .build/release/ntfs-cli repair disk4s2     # ntfsfix
 ```
 
-마운트 시 관리자 권한 프롬프트가 뜹니다 (ntfs-3g가 raw device 쓰기 접근에 root 필요).
+실제 디스크 마운트 시 관리자 권한 프롬프트가 뜹니다
+(ntfs-3g가 `/dev/diskXsY` 쓰기 접근에 root 필요 — 파일시스템 스택 자체는 유저스페이스).
 
 ## 주의사항
 
@@ -56,8 +58,10 @@ NTFS 드라이브를 연결하면 목록에 표시됩니다. macOS가 읽기전�
   거부합니다. Windows에서 완전히 종료(Shift+종료) 후 연결하세요.
 - dirty 볼륨은 "복구"(ntfsfix) 또는 Windows의 chkdsk가 필요할 수 있습니다.
 - FUSE-T는 NFS loopback 방식이라 대용량 파일 성능이 네이티브보다 낮을 수 있습니다.
+- 검증됨: NTFS 이미지 파일에서 마운트·읽기·쓰기·언마운트 라운드트립 동작 확인.
 
 ## 라이선스
 
 - 이 프로젝트(앱/라이브러리 코드): MIT
 - ntfs-3g: GPL-2.0+/LGPL-2.0+ (서브프로세스로 실행, 링크 없음)
+- FUSE-T: fuse-t.org 배포 바이너리 (무료)
