@@ -56,6 +56,7 @@ struct VolumeRowView: View {
             Button("읽기/쓰기로 마운트") { store.mountRW(volume) }
                 .buttonStyle(.borderedProminent)
             Button("언마운트") { store.unmount(volume) }
+            Button("제거") { store.eject(volume) }
         case .fuseTReadWrite(let mp):
             Button("Finder") { NSWorkspace.shared.open(URL(fileURLWithPath: mp)) }
             Button("언마운트") { store.unmount(volume) }
@@ -65,6 +66,7 @@ struct VolumeRowView: View {
                 .buttonStyle(.borderedProminent)
             Button("읽기전용") { store.mountRO(volume) }
             Button("복구") { store.repair(volume) }
+            Button("제거") { store.eject(volume) }
         case .busy:
             EmptyView()
         }

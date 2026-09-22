@@ -109,7 +109,12 @@ public final class MountService: Sendable {
                 // FUSE-T는 umount fallback
                 let u = try CommandRunner.run("/sbin/umount", [mp])
                 guard u.exitCode == 0 else {
-                    throw NTFSManagerError.unmountFailed(r.stderr.isEmpty ? r.stdout : r.stderr)
+                    let out = r.stderr.isEmpty ? r.stdout : r.stderr
+                    if Self.isBusy(out) {
+                        throw NTFSManagerError.unmountFailed(
+                            "볼륨을 사용 중입니다. 열린 파일·Finder 창을 닫고 다시 시도하세요.")
+                    }
+                    throw NTFSManagerError.unmountFailed(out)
                 }
             }
         case .unmounted:
@@ -144,6 +149,11 @@ public final class MountService: Sendable {
     }
 
     // MARK: - helpers
+
+    static func isBusy(_ output: String) -> Bool {
+        let s = output.lowercased()
+        return s.contains("busy") || s.contains("in use") || s.contains("dissenter")
+    }
 
     static func isEmptyDir(_ path: String) -> Bool {
         (try? FileManager.default.contentsOfDirectory(atPath: path).isEmpty) ?? false
