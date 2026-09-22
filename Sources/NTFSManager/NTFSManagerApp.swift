@@ -8,8 +8,9 @@ struct NTFSManagerApp: App {
         WindowGroup("NTFS Manager") {
             ContentView()
                 .environmentObject(store)
-                .frame(minWidth: 560, minHeight: 200)
+                .frame(width: 620, height: 320)
         }
-        .defaultSize(width: 620, height: 320)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 }
