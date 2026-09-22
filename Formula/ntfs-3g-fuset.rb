@@ -16,7 +16,10 @@ class Ntfs3gFuset < Formula
 
   def install
     # FUSE-T 설치 경로: 시스템(/usr/local) 또는 유저스페이스(~/.fuse-t/usr/local)
-    fuset_prefix = ["/usr/local", "#{Dir.home}/.fuse-t/usr/local"].find do |p|
+    # 빌드 프로세스는 HOME이 스크럽되므로 passwd 엔트리로 실제 홈을 얻는다
+    require "etc"
+    real_home = Etc.getpwuid.dir
+    fuset_prefix = ["/usr/local", "#{real_home}/.fuse-t/usr/local"].find do |p|
       Dir.glob("#{p}/lib/libfuse-t*.dylib").any?
     end
     odie "FUSE-T가 설치되어 있지 않습니다. `Scripts/install-deps.sh` 또는 `brew install --cask fuse-t`를 실행하세요." unless fuset_prefix
