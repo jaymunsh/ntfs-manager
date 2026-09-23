@@ -55,7 +55,7 @@ NTFS 드라이브를 꽂으면 목록에 표시되고, 버튼 한 번으로 읽�
 ## 설치
 
 ```bash
-git clone <this-repo> && cd ntfs-manager
+git clone https://github.com/jaymunsh/ntfs-manager && cd ntfs-manager
 ./Scripts/install-deps.sh   # FUSE-T(유저스페이스 ~/.fuse-t) + ntfs-3g — 비밀번호 없이 설치
 ./Scripts/bundle-app.sh     # build/NTFSManager.app 생성
 open build/NTFSManager.app
@@ -68,8 +68,8 @@ open build/NTFSManager.app
 2. 이 repo를 로컬 tap으로 등록하고 `ntfs-3g-fuset` formula를 빌드해
    `/opt/homebrew`에 설치
 
-GitHub에 올라간 후에는: `brew install --cask fuse-t` 또는 위 스크립트,
-`brew tap <user>/ntfs-manager && brew install ntfs-3g-fuset`
+GitHub에서 직접 설치하려면: `brew install --cask fuse-t` 후
+`brew tap jaymunsh/ntfs-manager https://github.com/jaymunsh/ntfs-manager && brew install ntfs-3g-fuset`
 
 ## 사용
 

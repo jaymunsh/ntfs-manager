@@ -142,7 +142,8 @@ device나 `~/Documents` 같은 보호 경로 접근은 "책임 프로세스"의 
 tap으로 만들고 커스텀 formula(`Formula/ntfs-3g-fuset.rb`)를 뒀다:
 
 ```bash
-brew tap <user>/ntfs-manager && brew install ntfs-3g-fuset
+brew tap jaymunsh/ntfs-manager https://github.com/jaymunsh/ntfs-manager
+brew install ntfs-3g-fuset
 ```
 
 여기서 만난 함정들:
@@ -325,6 +326,6 @@ TCC라는 현대 macOS 보안 레이어에서 오는 게 흥미로웠다.
 실제 2TB 드라이브에서 감지 → R/W 마운트 → 쓰기 → 언마운트 → 제거까지
 검증했고, 헬퍼 설치 후에는 비밀번호 입력 없이 동작한다.
 
-- 코드: `github.com/<user>/ntfs-manager` (MIT)
+- 코드: `github.com/jaymunsh/ntfs-manager` (MIT)
 - 백엔드: FUSE-T + ntfs-3g, 전부 유저스페이스 — kext도 Reduced Security도
   없다.

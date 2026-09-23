@@ -33,7 +33,7 @@ struct SetupGuideView: View {
             Text(L("터미널에서 직접 설치:"))
                 .font(.callout).bold()
             CodeBlock("brew install --cask fuse-t\n" +
-                      "brew tap <github-user>/ntfs-manager\n" +
+                      "brew tap jaymunsh/ntfs-manager https://github.com/jaymunsh/ntfs-manager\n" +
                       "brew install ntfs-3g-fuset")
 
             Text(L("또는 앱에서 자동 설치:"))
