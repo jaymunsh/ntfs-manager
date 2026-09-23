@@ -18,23 +18,6 @@
 NTFS 드라이브를 꽂으면 목록에 표시되고, 버튼 한 번으로 읽기/쓰기로
 마운트됩니다.
 
-## 스크린샷
-
-<p align="center">
-  <img src="docs/screenshots/detected-readonly.png" width="620" alt="macOS 읽기 전용으로 감지된 NTFS 볼륨"><br>
-  <sub>macOS가 읽기 전용으로 자동 마운트한 볼륨이 감지된 상태</sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/mounted-readwrite.png" width="620" alt="읽기/쓰기 마운트 완료"><br>
-  <sub>버튼 한 번으로 ntfs-3g + FUSE-T 읽기/쓰기 마운트</sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/ejected.png" width="620" alt="안전 제거 완료"><br>
-  <sub>제거 후 안내 — 언마운트된 볼륨에서도 제거 버튼 제공</sub>
-</p>
-
 ## 기능
 
 - NTFS 볼륨 자동 감지 (GPT `Microsoft Basic Data` / MBR `Windows_NTFS` 모두)
